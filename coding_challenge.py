@@ -23,35 +23,50 @@ def get_words_same_length(state, words_array):
         for word in words_array:
             if len(target) == len(word):
                 possibles.append(word)
+        if len(possibles) == 0:
+            print("can't find word with length {}".format(len(target)))
         possible_words.append(possibles)
     return possible_words
 
 
 def find_possible_words(state, possibles):
-    possibles_new = []
+    if len(possibles) != len(state):
+        print("state: {}".format(state))
+        print("possibles: {}".format(possibles))
+        print("state length: {}".format(len(state)))
+        print("possibles length: {}".format((len(possibles))))
+        return [['Z']]
+        #raise ValueError("cant fucking continue")
+
+    possibles_new = [] #stores new possible words
     for i in range(len(state)): #go through all of the words in the state
         letter_dict = {} #good letters
         for j in range(len(state[i])):
+            if state[i][j] == '-' or state[i][j] == '(' or state[i][j] == ')' or state[i][j] == '?' or state[i][j] == '!': #ignore these special characterrs
+                continue
             if state[i][j] != '_': #if not all underscores, then store char in dictionary (position, char)
                 letter_dict[j] = state[i][j]
 
         good_words = [] #stores possible words corresponding to each word in the state
         if (len(possibles) == 0):
+
             print("no possibles!")
             continue
 
         if len(letter_dict) == 0:
+            possibles_new.append(possibles[i])
             continue
 
-        for word in possibles[i]: #possibles[i] = all th words that might be at position i of state
-            print("possible word for state word {0} (length {1}): {2} (length {3})".format(state[i], len(state[i]), word, len(word)))
+        print("length: {}".format(len(possibles)))
+        for word in possibles[i]: #possibles[i] = all the words that might be at position i of state
+            #print("possible word for state word {0} (length {1}): {2} (length {3})".format(state[i], len(state[i]), word, len(word)))
             matching_letters = 0
+            #print("word: {0}, dict: {1}".format(word, letter_dict))
             for key, value in letter_dict.items():
                 if word[key] == value:
                     matching_letters += 1
 
             if matching_letters == len(letter_dict): #all letters are in promising positions
-                print(word)
                 good_words.append(word)
 
         if len(good_words) != 0:
@@ -73,20 +88,15 @@ def get_most_frequent_letter(words, used_letters):
                 if not already_used:
                     frequencies[ord(letter) - 97] += 1
 
-    return chr(frequencies.index(max(frequencies)) + 97)
+    return chr(frequencies.index(max(frequencies)) + 97), max(frequencies)
 
 
 def get_remaining_letters(letters_used):
     return list(set(most_popular_letters) - set(letters_used))
 
+'''
 
-for words in possible_words:
-    for word in words:
-        if len(word) == 1 or len(word) == 2 && 'a' not in used_letters:
-            char = 'a'
-        else if len(word) == 1 or len(word) == 2 && 'i' not in used_letters:
-            char = 'i'
-
+'''
 def main():
     words_list = init()
 
@@ -108,7 +118,10 @@ def main():
 
         used_letters = []
         char = 'e'
+        hack = False
         while status == 'ALIVE':
+            if hack:
+                break
             response = requests.post(endpoint, data={'guess': char})
             data = response.json()
             state = data['state'].split()
@@ -116,14 +129,29 @@ def main():
             remaining_guesses = data['remaining_guesses']
             if remaining_guesses == remaining_guesses_before_last_guess:
                 possible_words = find_possible_words(state, possible_words)
-                print("number of possible words in array: {}".format(len(possible_words)))
-                print("possible words: {}".format(possible_words))
+                if len(possible_words) != 0 and possible_words[0][0] == 'Z':
+                    print("error encountered")
+                    break
             remaining_guesses_before_last_guess = remaining_guesses
             used_letters.append(char)
-            char = get_most_frequent_letter(possible_words, used_letters)
+            special_case = False
+            for words in possible_words:
+                for word in words:
+                    if len(word) == 1 or len(word) == 2 and 'a' not in used_letters:
+                        char = 'a'
+                        special_case = True
+                    elif len(word) == 1 or len(word) == 2 and 'i' not in used_letters:
+                        char = 'i'
+                        special_case = True
+            if not special_case:
+                char, frequency = get_most_frequent_letter(possible_words, used_letters)
+                if remaining_guesses == 1 and frequency <= 2:
+                    hack = True
 
         rounds_played += 1
-        print(data['lyrics'])
+        print("rounds_played: {}".format(rounds_played))
+        if status == 'DEAD':
+            print(data['lyrics'])
 
     print(data['win_rate'])
 
