@@ -13,7 +13,7 @@ most_popular_letters = list(letters)
 def init():
     file = open(words_path)
     words_list = [line.strip('\n') for line in file]
-    return words_list
+    return words_list, file
 
 
 def get_words_same_length(state, words_array):
@@ -40,21 +40,21 @@ def find_possible_words(state, possibles):
 
     possibles_new = [] #stores new possible words
     for i in range(len(state)): #go through all of the words in the state
-        letter_dict = {} #good letters
+        letter_dict = {} #letters found in current state
         for j in range(len(state[i])):
             if state[i][j] == '-' or state[i][j] == '(' or state[i][j] == ')' or state[i][j] == '?' or state[i][j] == '!': #ignore these special characterrs
                 continue
             if state[i][j] != '_': #if not all underscores, then store char in dictionary (position, char)
-                letter_dict[j] = state[i][j]
+                letter_dict[j] = state[i][j] #store the new letter into a dictionary for quick lookup time
 
-        good_words = [] #stores possible words corresponding to each word in the state
+        good_words = [] #stores possible words from the wordlist file corresponding to each word in the state
         if (len(possibles) == 0):
-
             print("no possibles!")
             continue
 
         if len(letter_dict) == 0:
-            possibles_new.append(possibles[i])
+            possibles_new.append(possibles[i]) #append the old possible words list
+            print("added old words as new words: {}".format(j))
             continue
 
         print("length: {}".format(len(possibles)))
@@ -69,8 +69,10 @@ def find_possible_words(state, possibles):
             if matching_letters == len(letter_dict): #all letters are in promising positions
                 good_words.append(word)
 
-        if len(good_words) != 0:
-            possibles_new.append(good_words)
+        if len(good_words) == 0:
+            print("no good words were found")
+        possibles_new.append(good_words)
+
     return possibles_new
 
 
@@ -94,21 +96,24 @@ def get_most_frequent_letter(words, used_letters):
 def get_remaining_letters(letters_used):
     return list(set(most_popular_letters) - set(letters_used))
 
-'''
 
-'''
 def main():
-    words_list = init()
-
     rounds_played = 0
 
+    additional_words = []
     while rounds_played < 100: #initialization step
+        words_list, file = init()
         data = requests.get(endpoint).json()
         state = data['state'].split()
         status = data['status']
         remaining_guesses = data['remaining_guesses']
         remaining_guesses_before_last_guess = remaining_guesses
         possible_words = get_words_same_length(state, words_list)
+        for newly_found in additional_words:
+            file.write(newly_found)
+            file.write("\n")
+        file.close()
+        additional_words = []
         assert (len(possible_words) == len(state))
         for i in range(len(state)):
             for j in range(len(possible_words[i])):
@@ -129,7 +134,9 @@ def main():
             remaining_guesses = data['remaining_guesses']
             if remaining_guesses == remaining_guesses_before_last_guess:
                 possible_words = find_possible_words(state, possible_words)
-                if len(possible_words) != 0 and possible_words[0][0] == 'Z':
+                if len(possible_words) != len(state) and len(possible_words) != 1:
+                    print("what the actual fuck")
+                if len(possible_words) != 0 and len(possible_words[0]) != 0 and possible_words[0][0] == 'Z':
                     print("error encountered")
                     break
             remaining_guesses_before_last_guess = remaining_guesses
@@ -137,7 +144,7 @@ def main():
             special_case = False
             for words in possible_words:
                 for word in words:
-                    if len(word) == 1 or len(word) == 2 and 'a' not in used_letters:
+                    if len(word) == 1 or len(word) == 2 and 'a' not in used_letters: #hack for common 1-2 letter words
                         char = 'a'
                         special_case = True
                     elif len(word) == 1 or len(word) == 2 and 'i' not in used_letters:
@@ -151,7 +158,8 @@ def main():
         rounds_played += 1
         print("rounds_played: {}".format(rounds_played))
         if status == 'DEAD':
-            print(data['lyrics'])
+            for word in data['lyrics'].split():
+                additional_words.append(word)
 
     print(data['win_rate'])
 
